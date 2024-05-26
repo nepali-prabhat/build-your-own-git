@@ -3,7 +3,7 @@ use std::env;
 #[allow(unused_imports)]
 use std::fs;
 
-use clap::{arg, Command};
+use clap::{Command};
 
 fn cli() -> Command {
     Command::new("git")
