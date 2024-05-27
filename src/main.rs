@@ -28,6 +28,20 @@ enum Commands {
     },
 }
 
+#[derive(Debug, PartialEq)]
+enum ObjectType {
+    Blob,
+}
+
+impl ObjectType {
+    fn try_from(s: &str) -> Result<ObjectType, anyhow::Error> {
+        match s {
+            "blob" => Ok(ObjectType::Blob),
+            _ => anyhow::bail!("invalid object type {}", s),
+        }
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -92,28 +106,32 @@ fn main() -> anyhow::Result<()> {
 
             let s = std::str::from_utf8(&buffer).expect("must be valid utf8");
             let mut s = s.split(" ");
-            let obj_type = s.next();
-            if obj_type == Some("blob") {
-                let n = s.next().context("reading number of bytes")?;
-                let n = n.parse::<usize>().context("parsing number of bytes")?;
 
-                // read exactly n number of bytes from the reader;
-                buffer.clear();
-                buffer.resize(n, 0);
+            let ot = s.next().context("no object type")?;
+            let obj_type = ObjectType::try_from(ot)?;
 
-                reader
-                    .read_exact(&mut buffer)
-                    .context("reading the contents of the file")?;
-                let x = reader.read(&mut [0]).expect("ensuring EOF");
-                anyhow::ensure!(x == 0, "didn't reach EOF");
+            match obj_type {
+                ObjectType::Blob => {
+                    let n = s.next().context("reading number of bytes")?;
+                    let n = n.parse::<usize>().context("parsing number of bytes")?;
 
-                // read exactly n number of bytes from the reader;
-                let stdout = io::stdout();
-                let mut handle = stdout.lock();
-                handle.write_all(&buffer)?;
-            } else {
-                anyhow::bail!("unsupported object type {}", obj_type.unwrap_or(""));
+                    // read exactly n number of bytes from the reader;
+                    buffer.clear();
+                    buffer.resize(n, 0);
+
+                    reader
+                        .read_exact(&mut buffer)
+                        .context("reading the contents of the file")?;
+                    let x = reader.read(&mut [0]).expect("ensuring EOF");
+                    anyhow::ensure!(x == 0, "didn't reach EOF");
+
+                    // read exactly n number of bytes from the reader;
+                    let stdout = io::stdout();
+                    let mut handle = stdout.lock();
+                    handle.write_all(&buffer)?;
+                }
             }
+
         }
     }
     Ok(())
