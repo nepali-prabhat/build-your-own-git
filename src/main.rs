@@ -21,7 +21,11 @@ enum Commands {
     Init,
 
     /// Print the contents of a git object
-    CatFile { object_name: String },
+    CatFile {
+        #[arg(short)]
+        pretty_print: bool,
+        object_name: String,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -37,7 +41,10 @@ fn main() -> anyhow::Result<()> {
                 fs::write(".git/HEAD", "ref: refs/heads/main\n").context("creating HEAD file")?;
             }
         }
-        Commands::CatFile { object_name } => {
+        Commands::CatFile {
+            pretty_print: _,
+            object_name,
+        } => {
             let objects_dir = Path::new(".git/objects");
             let dir = fs::read_dir(objects_dir.join(&object_name[..2]))
                 .context("reading object directory")?;
