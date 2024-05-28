@@ -178,6 +178,11 @@ fn main() -> anyhow::Result<()> {
                 let writer_path = Path::new(".git/objects")
                     .join(&obj_hash[0..2])
                     .join(&obj_hash[2..]);
+                eprintln!("writer path: {:?}", writer_path);
+
+                let _ = fs::create_dir(writer_path.parent().expect("never returns None"))
+                    .context("creating directory");
+
                 let writer = fs::File::create(writer_path).context("creating object file")?;
                 let mut writer = ZlibEncoder::new(writer, Compression::default());
                 writer
