@@ -1,9 +1,10 @@
-use std::{fs, rc::Rc};
+use std::fs;
 
 use anyhow::Context;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
+use nanoid::nanoid;
 use std::io;
 use std::io::prelude::*;
 
@@ -11,7 +12,7 @@ use clap::{Parser, Subcommand};
 use std::path::Path;
 
 use hex;
-use sha1::{Digest, Sha1};
+use sha1::{digest::core_api::CoreWrapper, Digest, Sha1, Sha1Core};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -35,7 +36,7 @@ enum Commands {
     HashObject {
         #[arg(short)]
         write: bool,
-        file_path: String,
+        file_path: std::path::PathBuf,
     },
 }
 
@@ -145,56 +146,70 @@ fn main() -> anyhow::Result<()> {
         }
 
         Commands::HashObject { write, file_path } => {
-            let mut buffer = Vec::new();
+            let num_bytes = fs::metadata(&file_path)
+                .context("Reading file metadata")?
+                .len();
 
-            let mut file = fs::File::open(Path::new(&file_path)).context("opening the file")?;
+            // temporary file because we don't know the hash yet
+            let temp_filename = format!("/tmp/{}", nanoid!());
+            let temp_obj_file = fs::File::create(&Path::new(&temp_filename))
+                .with_context(|| format!("creating temporary object file {}", temp_filename))?;
 
-            //NOTE: this is bad because we are loading the entire contents of the file into the
-            // memory. It would be better if we could stream the contents in a buffered manner.kjj
-            file.read_to_end(&mut buffer)
-                .context("reading contents of file")?;
-            let num_bytes = buffer.len();
+            let writer = ZlibEncoder::new(temp_obj_file, Compression::default());
+            let hasher = Sha1::new();
+            let mut writer = if write {
+                HashWriter::<Box<dyn Write>> {
+                    writer: Box::new(writer),
+                    hasher,
+                }
+            } else {
+                HashWriter::<Box<dyn Write>> {
+                    writer: Box::new(io::sink()),
+                    hasher,
+                }
+            };
 
-            eprintln!("buffer count: {:?}", num_bytes);
-            let mut header = Vec::from(b"blob ");
-            for b in num_bytes.to_string().as_bytes() {
-                header.push(*b);
-            }
-            header.push(0);
-            eprintln!("header: {:?}", header);
+            write!(writer, "{} {}\0", "blob", num_bytes).context("writing header")?;
 
-            let header: Rc<[u8]> = Rc::from(header);
-            let buffer: Rc<[u8]> = Rc::from(buffer);
+            io::copy(
+                &mut fs::File::open(file_path).context("opening the file for content")?,
+                &mut writer,
+            )
+            .context("writing contents of file to the temporary file")?;
 
-            // create a Sha1 object
-            let mut hasher = Sha1::new();
-            hasher.update(header.clone());
-            hasher.update(buffer.clone());
-
-            let result = hasher.finalize();
-            let obj_hash = hex::encode(result);
+            let obj_hash = writer.hasher.finalize();
+            let obj_hash = hex::encode(obj_hash);
 
             if write {
                 let writer_path = Path::new(".git/objects")
                     .join(&obj_hash[0..2])
                     .join(&obj_hash[2..]);
-                eprintln!("writer path: {:?}", writer_path);
 
-                let _ = fs::create_dir(writer_path.parent().expect("never returns None"))
-                    .context("creating directory");
+                fs::create_dir_all(writer_path.parent().expect("never returns None"))
+                    .context("creating object directory")?;
 
-                let writer = fs::File::create(writer_path).context("creating object file")?;
-                let mut writer = ZlibEncoder::new(writer, Compression::default());
-                writer
-                    .write_all(&(header.clone()))
-                    .context("writing compressed header to object file")?;
-                writer
-                    .write_all(&(buffer.clone()))
-                    .context("writing compressed contents to object file")?;
+                fs::rename(&temp_filename, &writer_path).context("creating object file")?;
             }
 
             println!("{}", obj_hash);
         }
     }
     Ok(())
+}
+
+struct HashWriter<W> {
+    writer: W,
+    hasher: CoreWrapper<Sha1Core>,
+}
+
+impl<W: Write> Write for HashWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let n = self.writer.write(&buf)?;
+        self.hasher.update(&buf[..n]);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
 }
