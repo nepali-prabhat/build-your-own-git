@@ -1,12 +1,17 @@
-use std::fs;
+use std::{fs, rc::Rc};
 
 use anyhow::Context;
 use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use std::io;
 use std::io::prelude::*;
 
 use clap::{Parser, Subcommand};
 use std::path::Path;
+
+use hex;
+use sha1::{Digest, Sha1};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -22,9 +27,15 @@ enum Commands {
 
     /// Print the contents of a git object
     CatFile {
-        #[arg(short)]
+        #[clap(short)]
         pretty_print: bool,
         object_name: String,
+    },
+
+    HashObject {
+        #[arg(short)]
+        write: bool,
+        file_path: String,
     },
 }
 
@@ -131,7 +142,53 @@ fn main() -> anyhow::Result<()> {
                     handle.write_all(&buffer)?;
                 }
             }
+        }
 
+        Commands::HashObject { write, file_path } => {
+            let mut buffer = Vec::new();
+
+            let mut file = fs::File::open(Path::new(&file_path)).context("opening the file")?;
+
+            //NOTE: this is bad because we are loading the entire contents of the file into the
+            // memory. It would be better if we could stream the contents in a buffered manner.kjj
+            file.read_to_end(&mut buffer)
+                .context("reading contents of file")?;
+            let num_bytes = buffer.len();
+
+            eprintln!("buffer count: {:?}", num_bytes);
+            let mut header = Vec::from(b"blob ");
+            for b in num_bytes.to_string().as_bytes() {
+                header.push(*b);
+            }
+            header.push(0);
+            eprintln!("header: {:?}", header);
+
+            let header: Rc<[u8]> = Rc::from(header);
+            let buffer: Rc<[u8]> = Rc::from(buffer);
+
+            // create a Sha1 object
+            let mut hasher = Sha1::new();
+            hasher.update(header.clone());
+            hasher.update(buffer.clone());
+
+            let result = hasher.finalize();
+            let obj_hash = hex::encode(result);
+
+            if write {
+                let writer_path = Path::new(".git/objects")
+                    .join(&obj_hash[0..2])
+                    .join(&obj_hash[2..]);
+                let writer = fs::File::create(writer_path).context("creating object file")?;
+                let mut writer = ZlibEncoder::new(writer, Compression::default());
+                writer
+                    .write_all(&(header.clone()))
+                    .context("writing compressed header to object file")?;
+                writer
+                    .write_all(&(buffer.clone()))
+                    .context("writing compressed contents to object file")?;
+            }
+
+            println!("{}", obj_hash);
         }
     }
     Ok(())
