@@ -14,7 +14,6 @@ pub(crate) fn handler(inputs: crate::LsTree) -> anyhow::Result<()> {
 
             let mut buffer: Vec<u8> = Vec::new();
 
-            let mut entered = false;
             loop {
                 buffer.clear();
 
@@ -22,8 +21,6 @@ pub(crate) fn handler(inputs: crate::LsTree) -> anyhow::Result<()> {
 
                 if n == 0 {
                     break;
-                }else if entered {
-                    write!(&mut op, "\n").context("new line to stdout")?;
                 }
                 buffer.pop();
 
@@ -53,8 +50,7 @@ pub(crate) fn handler(inputs: crate::LsTree) -> anyhow::Result<()> {
                     write!(&mut op, "{}    ", sha1_hash).context("sha1 hash to stdout")?;
                 }
 
-                write!(&mut op, "{}", filename).context("filename to stdout")?;
-                entered = true;
+                write!(&mut op, "{}\n", filename).context("filename to stdout")?;
             }
         }
         _ => {
