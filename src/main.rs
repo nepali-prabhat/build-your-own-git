@@ -23,9 +23,14 @@ pub(crate) enum Commands {
     /// Creates an object hash of a file
     HashObject(HashObject),
 
+    /// Print the contents of a tree object
     LsTree(LsTree),
 
+    /// Create git tree+blob objects for the current folder
     WriteTree,
+
+    /// Create a commit object
+    CommitTree(CommitTree)
 }
 
 #[derive(Debug, Parser)]
@@ -49,6 +54,17 @@ pub(crate) struct LsTree {
     tree_sha: String,
 }
 
+#[derive(Debug, Parser)]
+pub(crate) struct CommitTree {
+    #[arg(short, required=true)]
+    message: String,
+
+    #[arg(short)]
+    parent: Option<String>,
+
+    tree_hash: String
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -68,6 +84,10 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::WriteTree => {
             let hash = commands::write_tree::handler(&PathBuf::from("."))?;
+            println!("{hash}");
+        }
+        Commands::CommitTree(v) => {
+            let hash = commands::commit_tree::handler(v)?;
             println!("{hash}");
         }
     }

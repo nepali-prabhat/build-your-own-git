@@ -117,7 +117,7 @@ pub(crate) fn handler(root: &Path) -> anyhow::Result<String> {
         )
     })?;
 
-    fs::rename(temp_filename_encoded, path).context("move file to objects directory")?;
+    fs::rename(temp_filename_encoded, path).context("move temp file to objects directory")?;
     fs::remove_file(temp_filename).context("deleting uncompressed tree file")?;
 
     return Ok(obj_hash);

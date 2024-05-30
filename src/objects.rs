@@ -12,6 +12,7 @@ use flate2::read::ZlibDecoder;
 pub(crate) enum ObjectType {
     Blob,
     Tree,
+    Commit,
 }
 
 impl fmt::Display for ObjectType {
@@ -19,6 +20,7 @@ impl fmt::Display for ObjectType {
         match self {
             Self::Blob => f.write_str("blob"),
             Self::Tree => f.write_str("tree"),
+            Self::Commit => f.write_str("commit"),
         }
     }
 }
@@ -30,6 +32,7 @@ impl TryFrom<&[u8]> for ObjectType {
         match value {
             b"blob" => Ok(ObjectType::Blob),
             b"tree" => Ok(ObjectType::Tree),
+            b"commit" => Ok(ObjectType::Commit),
             _ => anyhow::bail!(
                 "invalid object type {}",
                 std::str::from_utf8(value).context("converting object type to utf8")?
@@ -96,7 +99,7 @@ fn find_any(hash: &str) -> anyhow::Result<Vec<fs::DirEntry>> {
 }
 
 /// Get exactly 1 object based on the parial hash passed
-fn find_one(hash: &str) -> anyhow::Result<std::path::PathBuf> {
+pub(crate) fn find_one(hash: &str) -> anyhow::Result<std::path::PathBuf> {
     let matched_objects = find_any(&hash)?;
 
     let total_matched = matched_objects.len();
