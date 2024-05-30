@@ -18,7 +18,7 @@ impl fmt::Display for ObjectType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Blob => f.write_str("blob"),
-            Self::Tree => f.write_str("blob"),
+            Self::Tree => f.write_str("tree"),
         }
     }
 }

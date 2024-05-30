@@ -1,7 +1,9 @@
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 pub(crate) mod commands;
 pub(crate) mod objects;
+pub(crate) mod hash_writer;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -22,6 +24,8 @@ pub(crate) enum Commands {
     HashObject(HashObject),
 
     LsTree(LsTree),
+
+    WriteTree,
 }
 
 #[derive(Debug, Parser)]
@@ -56,10 +60,15 @@ fn main() -> anyhow::Result<()> {
         }
 
         Commands::HashObject(v) => {
-            commands::hash_object::handler(v)?;
+            let hash = commands::hash_object::handler(v)?;
+            println!("{hash}");
         }
         Commands::LsTree(v) => {
             commands::ls_tree::handler(v)?;
+        }
+        Commands::WriteTree => {
+            let hash = commands::write_tree::handler(&PathBuf::from("."))?;
+            println!("{hash}");
         }
     }
     Ok(())

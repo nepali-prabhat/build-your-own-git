@@ -176,6 +176,7 @@ dependencies = [
  "clap",
  "flate2",
  "hex",
+ "is_executable",
  "nanoid",
  "sha1",
  "thiserror",
@@ -222,6 +223,15 @@ dependencies = [
  "io-lifetimes",
  "rustix",
  "windows-sys",
+]
+
+[[package]]
+name = "is_executable"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa9acdc6d67b75e626ad644734e8bc6df893d9cd2a834129065d3dd6158ea9c8"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]

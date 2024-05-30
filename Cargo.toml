@@ -21,3 +21,4 @@ hex = "0.4.3"                                                      # working wit
 anyhow = "1.0.59"
 thiserror = "1.0.32"                                               # error handling
 nanoid = "0.4.0"
+is_executable = "1.0.1"

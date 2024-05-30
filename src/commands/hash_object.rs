@@ -7,11 +7,14 @@ use anyhow::Context;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use nanoid::nanoid;
-use sha1::{digest::core_api::CoreWrapper, Digest, Sha1, Sha1Core};
+use sha1::{Digest, Sha1};
 
 use hex;
 
-pub(crate) fn handler(inputs: crate::HashObject) -> anyhow::Result<()> {
+use crate::hash_writer::HashWriter;
+
+
+pub(crate) fn handler(inputs: crate::HashObject) -> anyhow::Result<String> {
     let write = inputs.write;
     let file_path = inputs.file_path;
 
@@ -60,24 +63,6 @@ pub(crate) fn handler(inputs: crate::HashObject) -> anyhow::Result<()> {
         fs::rename(&temp_filename, &writer_path).context("creating object file")?;
     }
 
-    println!("{}", obj_hash);
-
-    Ok(())
+    Ok(obj_hash)
 }
 
-struct HashWriter<W> {
-    writer: W,
-    hasher: CoreWrapper<Sha1Core>,
-}
-
-impl<W: Write> Write for HashWriter<W> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let n = self.writer.write(&buf)?;
-        self.hasher.update(&buf[..n]);
-        Ok(n)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.writer.flush()
-    }
-}

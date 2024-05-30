@@ -9,7 +9,8 @@ pub(crate) fn handler(inputs: crate::LsTree) -> anyhow::Result<()> {
     let (obj_type, mut reader) = ObjectType::get_handle(inputs.tree_sha)?;
     match obj_type {
         ObjectType::Tree => {
-            let mut op = io::stdout();
+            let op = io::stdout();
+            let mut op = op.lock();
             let mut hash = vec![0; 20];
 
             let mut buffer: Vec<u8> = Vec::new();
@@ -25,7 +26,7 @@ pub(crate) fn handler(inputs: crate::LsTree) -> anyhow::Result<()> {
                 buffer.pop();
 
                 if !inputs.name_only {
-                    let mut mode = std::str::from_utf8(&buffer[..])?;
+                    let mut mode = std::str::from_utf8(&buffer[..]).context("converting to utf8 string")?;
                     let obj_type = match mode {
                         "100644" | "100755" | "120000" => ObjectType::Blob,
                         "40000" => {
@@ -44,7 +45,7 @@ pub(crate) fn handler(inputs: crate::LsTree) -> anyhow::Result<()> {
                 buffer.pop();
                 let filename = std::str::from_utf8(&buffer[..])?;
 
-                reader.read_exact(&mut hash)?;
+                reader.read_exact(&mut hash).context("reading the hash")?;
                 let sha1_hash = hex::encode(&hash[..]);
                 if !inputs.name_only {
                     write!(&mut op, "{}    ", sha1_hash).context("sha1 hash to stdout")?;
